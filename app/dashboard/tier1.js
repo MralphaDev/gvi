@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -17,6 +18,9 @@ export default function Tier1() {
 const [reportType, setReportType] = useState("monthly");
 const [reportData, setReportData] = useState([]);
 const [reportValue, setReportValue] = useState('');      // 选中的年份/月/季度
+
+//const [page, setPage] = React.useState(1);
+const [selectedCompany, setSelectedCompany] = React.useState(""); // 默认显示全部
 
   // fetch products & log
   useEffect(() => {
@@ -173,35 +177,54 @@ const handleLogDelete = async () => {
       <h1 className="text-2xl font-bold mb-6">Tier 1 Dashboard</h1>
       <div className="grid grid-cols-2 gap-6 ">
 
-        {/* Product Inventory */}
-        <div className="bg-zinc-800 rounded-xl p-4 overflow-auto  flex flex-col gap-4">
-          <h2 className="text-lg font-semibold mb-2">Product Inventory</h2>
-          {/* Search Bar */}
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              placeholder="Search Product Name..."
-              value={searchProduct}
-              onChange={(e) => setSearchProduct(e.target.value)}
-              className="p-2 rounded bg-zinc-900 text-white flex-1"
-            />
-            <button onClick={fetchProducts} className="bg-blue-600 px-4 py-2 rounded">Search</button>
-            <button 
-              onClick={() => { 
-                setSearchProduct("");        // 清空输入框
-                fetch(`/api/products`)       // 直接 fetch 全部，不用 fetchProducts()
-                  .then(res => res.json())
-                  .then(data => setProducts(data));
-              }} 
-              className="bg-gray-600 px-4 py-2 rounded"
-            >
-              Deselect
-            </button>
+      {/* Product Inventory */}
+      <div className="bg-zinc-800 rounded-xl p-4 overflow-auto flex flex-col gap-4">
+        <h2 className="text-lg font-semibold mb-2">Product Inventory</h2>
 
+        {/* Company Filter Dropdown */}
+        <div className="mb-2">
+          <select
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+            className="p-2 rounded bg-zinc-900 text-white"
+          >
+            <option value="">All Companies</option>
+            <option value="ceme">CEME</option>
+            <option value="jaksa">JAKSA</option>
+            <option value="saturn">SATURN</option>
+            <option value="rotork">ROTORK</option>
+            <option value="goetvalve">GOETVALVE</option>
+          </select>
         </div>
 
-          <ul className="space-y-2 overflow-auto max-h-100">
-            {products.map((p) => (
+        {/* Search Bar */}
+        <div className="flex gap-2 mb-2">
+          <input
+            type="text"
+            placeholder="Search Product Name..."
+            value={searchProduct}
+            onChange={(e) => setSearchProduct(e.target.value)}
+            className="p-2 rounded bg-zinc-900 text-white flex-1"
+          />
+          <button onClick={fetchProducts} className="bg-blue-600 px-4 py-2 rounded">Search</button>
+          <button 
+            onClick={() => { 
+              setSearchProduct("");
+              fetch(`/api/products`)
+                .then(res => res.json())
+                .then(data => setProducts(data));
+            }} 
+            className="bg-gray-600 px-4 py-2 rounded"
+          >
+            Deselect
+          </button>
+        </div>
+
+        {/* Product List */}
+        <ul className="space-y-2 overflow-auto max-h-100">
+          {products
+            .filter(p => !selectedCompany || p.manufacturer === selectedCompany)
+            .map((p) => (
               <li key={p.id} className="border-b border-zinc-700 pb-1 flex justify-between items-center">
                 <img src={p.src} alt={p.name} className="w-20 h-20 object-cover rounded" />
                 <span><strong>{p.name}</strong> — Inventory: {p.current_inventory}</span>
@@ -210,17 +233,21 @@ const handleLogDelete = async () => {
                   <button className="bg-red-600 px-2 rounded" onClick={() => handleProductDelete(p.id)}>Delete</button>
                 </div>
               </li>
-            ))}
-          </ul>
-          <div className="flex flex-col gap-2 mt-2">
-            <input name="name" value={productForm.name} onChange={(e) => handleChange(e, "product")} placeholder="Name" className="p-2 rounded bg-zinc-900 text-white"/>
-            <input name="category" value={productForm.category} onChange={(e) => handleChange(e, "product")} placeholder="Category" className="p-2 rounded bg-zinc-900 text-white"/>
-            <input type="number" name="current_inventory" value={productForm.current_inventory} onChange={(e) => handleChange(e, "product")} placeholder="Inventory" className="p-2 rounded bg-zinc-900 text-white"/>
-            <button className={`p-2 rounded ${productForm.id ? "bg-blue-600" : "bg-green-600"}`} onClick={handleProductSubmit}>
-              {productForm.id ? "Update Product" : "Add Product"}
-            </button>
-          </div>
+            ))
+          }
+        </ul>
+
+        {/* Product Form */}
+        <div className="flex flex-col gap-2 mt-2">
+          <input name="name" value={productForm.name} onChange={(e) => handleChange(e, "product")} placeholder="Name" className="p-2 rounded bg-zinc-900 text-white"/>
+          <input name="category" value={productForm.category} onChange={(e) => handleChange(e, "product")} placeholder="Category" className="p-2 rounded bg-zinc-900 text-white"/>
+          <input type="number" name="current_inventory" value={productForm.current_inventory} onChange={(e) => handleChange(e, "product")} placeholder="Inventory" className="p-2 rounded bg-zinc-900 text-white"/>
+          <button className={`p-2 rounded ${productForm.id ? "bg-blue-600" : "bg-green-600"}`} onClick={handleProductSubmit}>
+            {productForm.id ? "Update Product" : "Add Product"}
+          </button>
         </div>
+      </div>
+
 
         {/* Inventory Log */}
         <div className="bg-zinc-800 rounded-xl p-4 flex flex-col gap-4 ">
@@ -252,7 +279,7 @@ const handleLogDelete = async () => {
                 </button>
             </div>
 
-          <ul className="space-y-2 overflow-auto max-h-100">
+          <ul className="space-y-2 overflow-auto max-h-117">
             {inventoryLog.map((entry) => (
               <li key={entry.id} className="border-b border-zinc-700 pb-1 flex justify-between items-center">
                 <span>
