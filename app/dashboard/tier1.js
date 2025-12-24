@@ -328,13 +328,43 @@ const handleLogDelete = async () => {
         <div className="bg-zinc-800 rounded-xl p-4 mt-6">
           <h2 className="text-lg font-semibold mb-2">Sales Report</h2>
 
-          {/* Report Type Buttons */}
-          <div className="flex gap-2 mb-2">
-            <button className={`px-4 py-2 rounded ${reportType==='monthly'?'bg-blue-600':'bg-gray-600'}`} onClick={()=>setReportType('monthly')}>Monthly</button>
-            <button className={`px-4 py-2 rounded ${reportType==='seasonal'?'bg-blue-600':'bg-gray-600'}`} onClick={()=>setReportType('seasonal')}>Seasonal</button>
-            <button className={`px-4 py-2 rounded ${reportType==='yearly'?'bg-blue-600':'bg-gray-600'}`} onClick={()=>setReportType('yearly')}>Yearly</button>
-            <button className="bg-green-600 px-4 py-2 rounded" onClick={exportPDF}>Download PDF</button>
-          </div>
+        {/* Report Type Buttons */}
+        <div className="flex flex-wrap gap-2 mb-2">
+          <button
+            className={`px-4 py-2 rounded w-full sm:w-auto ${
+              reportType === 'monthly' ? 'bg-blue-600' : 'bg-gray-600'
+            }`}
+            onClick={() => setReportType('monthly')}
+          >
+            Monthly
+          </button>
+
+          <button
+            className={`px-4 py-2 rounded w-full sm:w-auto ${
+              reportType === 'seasonal' ? 'bg-blue-600' : 'bg-gray-600'
+            }`}
+            onClick={() => setReportType('seasonal')}
+          >
+            Seasonal
+          </button>
+
+          <button
+            className={`px-4 py-2 rounded w-full sm:w-auto ${
+              reportType === 'yearly' ? 'bg-blue-600' : 'bg-gray-600'
+            }`}
+            onClick={() => setReportType('yearly')}
+          >
+            Yearly
+          </button>
+
+          <button
+            className="bg-green-600 px-4 py-2 rounded w-full sm:w-auto sm:ml-auto"
+            onClick={exportPDF}
+          >
+            Download PDF
+          </button>
+        </div>
+
 
           {/* Report Value Selector */}
           <div className="flex gap-2 mb-4">
