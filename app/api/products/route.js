@@ -1,5 +1,6 @@
 // app/api/products/route.js
 import { getConnection } from "../../lib/db";
+import { NextResponse } from 'next/server';
 import mysql from "mysql2/promise";
 
 export async function GET(req) {
@@ -10,23 +11,25 @@ export async function GET(req) {
     let search = url.searchParams.get("search");
     let query = `
       SELECT 
-        id, name, category, src, price, serial_number, type, manufacturer,
+        id, name, category, src, price, model_number, type, manufacturer,
         form_factor, nominal_size, connection, connection_type, construction,
-        kv_value, switching_function, control, material, sealing, voltage,
+        kv_value, switching_function, control, material, sealing,
         voltage_tolerance, power_consumption, duty_cycle, protection_class,
         medium, medium_temperature, ambient_temperature, max_pressure,
-        installation_position, current_inventory
+        installation_position, current_inventory, inner_diameter, temperature_range,voltage
       FROM product_inventory
     `;
 
     const params = [];
     if (search && search.trim() !== "") {
-      query += " WHERE name LIKE ?";
-      params.push(`%${search}%`);
+      query += " WHERE model_number LIKE ?";
+      params.push(`%${search}%`); //防止sql注入
     }
 
     query += " ORDER BY id ASC";
 
+    // 执行 SQL 查询：query 是 SQL 模板，params 用来替换其中的 ?，
+    // 返回结果是 [rows, fields]，这里只解构拿到查询数据 rows
     const [rows] = await connection.execute(query, params);
 
 
@@ -44,105 +47,144 @@ export async function GET(req) {
   }
 }
 
-export async function POST(req) {
+// app/api/products/route.js
+
+
+export async function POST(request) {
   try {
-    const data = await req.json();
     const connection = await getConnection();
+    const body = await request.json();
 
-    const safeValue = (v) => v !== undefined ? v : null;
+    const { id, ...data } = body;
 
-    const query = `
-      INSERT INTO product_inventory 
-        (name, category, src, price, serial_number, type, manufacturer,
-        form_factor, nominal_size, connection, connection_type, construction,
-        kv_value, switching_function, control, material, sealing, voltage,
-        voltage_tolerance, power_consumption, duty_cycle, protection_class,
-        medium, medium_temperature, ambient_temperature, max_pressure,
-        installation_position, current_inventory)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    // 处理对象字段，转换成带单位的字符串
+    if (data.voltage && typeof data.voltage === 'object') {
+      data.voltage = `${data.voltage.value}${data.voltage.unit}`;
+    }
 
-    const values = [
-      safeValue(data.name),
-      safeValue(data.category),
-      safeValue(data.src),
-      safeValue(data.price),
-      safeValue(data.serial_number),
-      safeValue(data.type),
-      safeValue(data.manufacturer),
-      safeValue(data.form_factor),
-      safeValue(data.nominal_size),
-      safeValue(data.connection),
-      safeValue(data.connection_type),
-      safeValue(data.construction),
-      safeValue(data.kv_value),
-      safeValue(data.switching_function),
-      safeValue(data.control),
-      safeValue(data.material),
-      safeValue(data.sealing),
-      safeValue(data.voltage),
-      safeValue(data.voltage_tolerance),
-      safeValue(data.power_consumption),
-      safeValue(data.duty_cycle),
-      safeValue(data.protection_class),
-      safeValue(data.medium),
-      safeValue(data.medium_temperature),
-      safeValue(data.ambient_temperature),
-      safeValue(data.max_pressure),
-      safeValue(data.installation_position),
-      safeValue(data.current_inventory ?? 0)
-    ];
+    if (data.max_pressure && typeof data.max_pressure === 'object') {
+      data.max_pressure = `${data.max_pressure.min}bar-${data.max_pressure.max}bar`;
+    }
 
-    const [result] = await connection.execute(query, values);
+    if (data.temperature_range && typeof data.temperature_range === 'object') {
+      data.temperature_range = `${data.temperature_range.min}℃-${data.temperature_range.max}℃`;
+    }
 
-    return new Response(JSON.stringify({ id: result.insertId }), {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ error: "Insert failed" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-}
+    const fields = [];
+    const values = [];
+    const placeholders = [];
 
-export async function PUT(req) {
-  try {
-    const data = await req.json();
-    const id = data.id; // <- 从 body 里取
-    if (!id) {
-      return new Response(JSON.stringify({ error: "Missing id" }), {
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined && value !== null && value !== '') {
+        fields.push(key);
+        values.push(value); // 现在都是字符串或数字
+        placeholders.push('?');
+      }
+    }
+
+    if (fields.length === 0) {
+      return new NextResponse(JSON.stringify({ error: 'No data provided' }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
+    const query = `
+      INSERT INTO product_inventory 
+      (${fields.join(', ')}) 
+      VALUES (${placeholders.join(', ')})
+    `;
+
+    const [result] = await connection.execute(query, values);
+
+    return new NextResponse(
+      JSON.stringify({ id: result.insertId, message: 'Product added successfully' }),
+      {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (error) {
+    console.error('POST /api/products error:', error);
+
+    return new NextResponse(
+      JSON.stringify({ error: error.message || '错误，请重试' }),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' }
+      }
+    );
+  }
+}
+
+
+
+export async function PUT(request) {
+  try {
     const connection = await getConnection();
+    const body = await request.json();
+
+    const { id, ...data } = body;
+
+    if (!id) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Missing product id' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 把对象字段转字符串
+    if (data.voltage && typeof data.voltage === 'object') {
+      data.voltage = `${data.voltage.value}${data.voltage.unit}`;
+    }
+    if (data.max_pressure && typeof data.max_pressure === 'object') {
+      data.max_pressure = `${data.max_pressure.min}bar-${data.max_pressure.max}bar`;
+    }
+    if (data.temperature_range && typeof data.temperature_range === 'object') {
+      data.temperature_range = `${data.temperature_range.min}℃-${data.temperature_range.max}℃`;
+    }
+
+    const fields = [];
+    const values = [];
+
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined && value !== null) { 
+        fields.push(`${key} = ?`);
+        values.push(value);
+      }
+    }
+
+    if (fields.length === 0) {
+      return new NextResponse(
+        JSON.stringify({ error: 'No data provided for update' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    values.push(id);
 
     const query = `
       UPDATE product_inventory
-      SET name=?, category=?, current_inventory=?
-      WHERE id=?
+      SET ${fields.join(', ')}
+      WHERE id = ?
     `;
 
-    const values = [data.name, data.category, data.current_inventory, id];
+    const [result] = await connection.execute(query, values);
 
-    await connection.execute(query, values);
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new NextResponse(
+      JSON.stringify({ message: 'Product updated successfully', affectedRows: result.affectedRows }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ error: "Update failed" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error('PUT /api/products error:', error);
+    return new NextResponse(
+      JSON.stringify({ error: error.message || 'Server error' }),
+      { status: 500 }
+    );
   }
 }
+
+
 
 
 
