@@ -20,7 +20,11 @@ export async function GET(req) {
         l.action_date, 
         l.remark,
         l.company_sold_to,
-        l.coil_id
+        l.coil_id,
+        l.mode,
+        l.export_price,
+        l.import_price,
+        l.voltage
       FROM inventory_log l
       LEFT JOIN product_inventory p ON l.product_id = p.id
     `;
@@ -53,14 +57,14 @@ export async function POST(req) {
   try {
     const connection = await getConnection();
     const body = await req.json();
-    const { product_id, action, quantity, voltage, company_sold_to, coil_id, mode } = body;
+     const { product_id, action, quantity, voltage, company_sold_to, coil_id, mode, export_price, import_price } = body;
 
     // 1. 插入 inventory_log
-    const [result] = await connection.execute(
-      `INSERT INTO inventory_log (product_id, action, quantity, action_date, voltage, company_sold_to, coil_id)
-       VALUES (?, ?, ?, NOW(), ?, ?, ?)`,
-      [product_id ?? null, action, quantity, voltage ?? null, company_sold_to ?? null, coil_id ?? null]
-    );
+const [result] = await connection.execute(
+  `INSERT INTO inventory_log (product_id, action, quantity, action_date, voltage, company_sold_to, coil_id, mode,export_price,import_price)
+   VALUES (?, ?, ?, NOW(), ?, ?, ?, ?,?,?)`,
+  [product_id ?? null, action, quantity, voltage ?? null, company_sold_to ?? null, coil_id ?? null, mode ?? null,export_price ?? null,import_price ?? null]
+);
 
     const delta = action === "IN" ? quantity : -quantity;
 
@@ -130,25 +134,27 @@ export async function POST(req) {
 export async function PUT(req) {
   try {
     const data = await req.json();
-    if (!data.id) return new Response(JSON.stringify({ error: "Missing id" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    if (!data.id) 
+      return new Response(JSON.stringify({ error: "Missing id" }), { status: 400, headers: { "Content-Type": "application/json" } });
 
     const connection = await getConnection();
     const query = `
       UPDATE inventory_log
-      SET product_id=?, action=?, quantity=?, company_sold_to=?, voltage=?, coil_id=?
+      SET product_id=?, action=?, quantity=?, company_sold_to=?, voltage=?, coil_id=?, mode=?, import_price=?, export_price=?
       WHERE id=?
     `;
     const values = [
       data.product_id,
       data.action,
-      data.quantity,
+      data.quantity ?? 0,
       data.company_sold_to ?? null,
       data.voltage ?? null,
       data.coil_id ?? null,
+      data.mode ?? null,
+      data.import_price ?? null,
+      data.export_price ?? null,
       data.id
     ];
-
-    await connection.execute(query, values);
 
     await connection.execute(query, values);
 
@@ -158,6 +164,7 @@ export async function PUT(req) {
     return new Response(JSON.stringify({ error: "Update failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
+
 
 export async function DELETE(req) {
   try {

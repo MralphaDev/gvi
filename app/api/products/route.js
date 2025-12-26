@@ -11,12 +11,8 @@ export async function GET(req) {
     let search = url.searchParams.get("search");
     let query = `
       SELECT 
-        id, name, category, src, price, model_number, type, manufacturer,
-        form_factor, nominal_size, connection, connection_type, construction,
-        kv_value, switching_function, control, material, sealing,
-        voltage_tolerance, power_consumption, duty_cycle, protection_class,
-        medium, medium_temperature, ambient_temperature, max_pressure,
-        installation_position, current_inventory, inner_diameter, temperature_range,voltage
+        id, name, category, src, price, model_number, manufacturer,
+         connection, max_pressure, current_inventory, inner_diameter, temperature_range,voltage
       FROM product_inventory
     `;
 

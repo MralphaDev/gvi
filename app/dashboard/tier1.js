@@ -2,13 +2,17 @@
 import React from "react";
 import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import html2canvas from "html2canvas";
+import 'jspdf-autotable';
+import "jspdf-fonts"; // 📌 自动包含了中文字体
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LabelList } from "recharts";
 import { FiMenu } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import "jspdf/dist/polyfills.umd"; // 确保兼容
+import html2canvas from 'html2canvas-pro';
+import autoTable from "jspdf-autotable";
 
 export default function Tier1() {
+
   const [products, setProducts] = useState([]);
   const [inventoryLog, setInventoryLog] = useState([]);
   const [coil, setCoil] = useState([]); // 新增 coil 状态
@@ -22,7 +26,6 @@ export default function Tier1() {
 const [productForm, setProductForm] = useState({
   id: "",
   name: "",
-  price: "",
   model_number: "",
   manufacturer: "",
   connection: "",
@@ -34,7 +37,7 @@ const [productForm, setProductForm] = useState({
 });
 
   const [startIndex, setStartIndex] = useState(0); // 当前显示的起始索引
-  const [logForm, setLogForm] = useState({ id: "", product_id: "", action: "IN", quantity: "",company_sold_to: "" ,voltage:"" , coil_id: null, mode: ""});
+  const [logForm, setLogForm] = useState({ id: "", product_id: "", action: "IN", quantity: "",company_sold_to: "" ,voltage:"" , coil_id: null, mode: "",export_price:"",import_price:""});
   const [searchProduct, setSearchProduct] = useState("");
   const [searchCoil, setSearchCoil] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -55,10 +58,10 @@ const [imagePreview, setImagePreview] = useState(null);
 
 const [onProductEdit, setOnProductEdit] = useState(false);
 const [onCoilEdit, setOnCoilEdit] = useState(false);
+const [onLogEdit, setOnLogEdit] = useState(false);
 
 const fields = [
   { name: "name", placeholder: "新产品名" },
-  { name: "price", placeholder: "价格", type: "number" },
   { name: "model_number", placeholder: "型号" },
   { name: "connection", placeholder: "连接" },
   { name: "inner_diameter", placeholder: "内径" },
@@ -66,6 +69,7 @@ const fields = [
   { name: "temperature_range", placeholder: "温度范围" },
   { name: "current_inventory", placeholder: "库存数量", type: "number" },
 ];
+
 
   // fetch products & log
   useEffect(() => {
@@ -97,49 +101,119 @@ const bestSellers = reportData
   .map(r => ({ name: r.product_name, quantity: r.quantity }));
 
 const generateReport = (type, value) => {
-    let filteredLogs = inventoryLog.filter(log => log.action === "OUT");
+  let filteredLogs = inventoryLog.filter(log => log.action === "OUT");
 
-    filteredLogs = filteredLogs.filter(log => {
-      const logDate = new Date(log.action_date);
-      if(type === 'yearly') {
-        return logDate.getFullYear() === +value;
-      } else if(type === 'monthly') {
-        const [year, month] = value.split('-');
-        return logDate.getFullYear() === +year && logDate.getMonth() === +month - 1;
-      } else if(type === 'seasonal') {
-        const [year, season] = value.split('-');
-        const logSeason = Math.floor(logDate.getMonth()/3) + 1;
-        return logDate.getFullYear() === +year && logSeason === +season;
-      }
-      return true;
-    });
+  filteredLogs = filteredLogs.filter(log => {
+    const d = new Date(log.action_date);
+    if (type === "yearly") return d.getFullYear() === +value;
+    if (type === "monthly") {
+      const [y, m] = value.split("-");
+      return d.getFullYear() === +y && d.getMonth() === +m - 1;
+    }
+    if (type === "seasonal") {
+      const [y, s] = value.split("-");
+      return d.getFullYear() === +y && Math.floor(d.getMonth() / 3) + 1 === +s;
+    }
+    return true;
+  });
 
   const map = {};
+
   filteredLogs.forEach(log => {
     const product = products.find(p => p.id === log.product_id);
-    if(!product) return;
-    //product name指的是product的model number
-    if(!map[log.product_id]) map[log.product_id] = { product_name: product.model_number, quantity: 0, sales: 0, price: Number(product.price || 0) };
+    if (!product) return;
+
+    if (!map[log.product_id]) {
+      map[log.product_id] = {
+        product_type: product.name,
+        product_name: product.model_number,
+        quantity: 0,
+        sales: 0,
+        voltages: [],
+        companies: [],
+      };
+    }
+
     map[log.product_id].quantity += log.quantity;
-    map[log.product_id].sales += log.quantity * Number(product.price || 0);
+    map[log.product_id].sales += log.quantity * Number(log.export_price || 0);
+    map[log.product_id].voltages.push(String(log.voltage));
+    map[log.product_id].companies.push(log.company_sold_to);
   });
 
-  setReportData(Object.values(map).sort((a,b)=>b.quantity - a.quantity));
-}
+  setReportData(
+    Object.values(map)
+      .map(r => ({
+        product_type: r.product_type,
+        product_name: r.product_name,
+        quantity: r.quantity,
+        sales: r.sales,
+        voltage: [...new Set(r.voltages)].join(" / "),
+        company_sold_to: [...new Set(r.companies)].join("，"),
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+  );
+};
+
 
 // 导出 PDF
-const exportPDF = () => {
-  const doc = new jsPDF();
-  doc.text(`${reportType.toUpperCase()} Report`, 14, 20);
 
-  // 直接用 autoTable(doc, {...})
-  autoTable(doc, {
-    head: [["Product", "Quantity Sold", "Sales/Euro"]],
-    body: reportData.map(r => [r.product_name, r.quantity, (r.quantity * Number(r.price)).toFixed(2)]),
-    startY: 30, // 避免覆盖标题
+const exportPDF = () => {
+  const doc = new jsPDF("p", "mm", "a4");
+
+  // 标题
+  doc.setFontSize(18);
+  doc.text("Sales Report", 14, 20);
+
+  let y = 40; // 当前纵坐标
+
+  // 按厂商分组
+  const grouped = reportData.reduce((acc, r) => {
+    const product = products.find(p => p.model_number === r.product_name);
+    const manufacturer = product?.manufacturer || "Unknown Manufacturer";
+    if (!acc[manufacturer]) acc[manufacturer] = [];
+    acc[manufacturer].push(r);
+    return acc;
+  }, {});
+
+  Object.entries(grouped).forEach(([manufacturer, items]) => {
+    // 换页检查
+    if (y > 270) {
+      doc.addPage();
+      y = 20;
+    }
+
+    // 厂商名
+    doc.setFontSize(14);
+    doc.text(manufacturer, 14, y);
+    y += 10;
+
+    // 表头
+    doc.setFontSize(10);
+    doc.text("No.  Name              Model             Voltage   Qty   Buyer                    Sales", 14, y);
+    y += 7;
+
+    // 数据行
+    items.forEach((item, idx) => {
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+
+      const line = `${(idx + 1).toString().padEnd(4)} ${ (item.product_type || '').padEnd(18) } ${ (item.product_name || '').padEnd(18) } ${ (item.voltage || '').padEnd(10) } ${ (item.quantity || 0).toString().padEnd(6) } ${ (item.company_sold_to || '').padEnd(25) } ${ item.sales || 0 }`;
+
+      doc.text(line, 14, y);
+      y += 7;
+    });
+
+    // 合计
+    const totalQty = items.reduce((s, r) => s + (r.quantity || 0), 0);
+    const totalSales = items.reduce((s, r) => s + (r.sales || 0), 0);
+    doc.setFontSize(11);
+    doc.text(`Total Quantity: ${totalQty}    Total Sales: ${totalSales} USD`, 14, y);
+    y += 15;
   });
 
-  doc.save(`${reportType}_report.pdf`);
+  doc.save("sales_report.pdf");
 };
 
 const fetchCoil = async () => {
@@ -151,6 +225,22 @@ const fetchCoil = async () => {
 
 const handleCoilSubmit = async () => {
   try {
+    // 必填字段校验
+    const fieldMap = {
+      name: "型号",
+      voltage: "电压",
+      inventory: "库存数量",
+      manufacturer: "生产厂家",
+    };
+
+    // 必填字段校验
+    const requiredFields = ["name", "voltage", "inventory", "manufacturer"];
+    for (let field of requiredFields) {
+      if (!coilForm[field] && coilForm[field] !== 0) { // inventory 为0也算填了
+        alert(`请填写 ${fieldMap[field]}`);
+        return;
+      }
+    }
     const voltageUnit = document.querySelector('select[name="voltageUnit"]').value;
     const uploadData = {
       ...coilForm,
@@ -179,7 +269,7 @@ const handleCoilSubmit = async () => {
 };
 
 const handleCoilDelete = async (id) => {
-  if (!confirm("Delete this coil?")) return;
+  if (!confirm("您确定要删除该线圈吗?")) return;
 
   try {
     const res = await fetch("/api/coil", {
@@ -219,6 +309,22 @@ const handleChange = (e, formType) => {
 };
 
 const handleProductSubmit = async () => {
+  // 中文字段映射
+  const fieldMap = {
+    name: "阀体类型",
+    model_number: "型号",
+    manufacturer: "生产厂家",
+  };
+
+  // 必填字段
+  const requiredFields = ["name", "model_number", "manufacturer"];
+  for (let field of requiredFields) {
+    if (!productForm[field]) {
+      alert(`请填写 ${fieldMap[field]}`);
+      return;
+    }
+  }
+
   const method = productForm.id ? "PUT" : "POST";
   const url = "/api/products"; // 统一接口
   const res = await fetch(url, {
@@ -228,38 +334,22 @@ const handleProductSubmit = async () => {
   });
 if (res.ok) {
   alert("操作成功！请考虑上传或更新对应线圈！")
-setProductForm({
+  setProductForm({
   id: "",
   name: "",
-  price: "",
+  category: "",
+  src: "",
   model_number: "",
+  type: "",
   manufacturer: "",
   connection: "",
-  inner_diameter: "",
-  max_pressure: { min: "", max: "" },           // 改成对象
-  temperature_range: { min: "", max: "" },      // 改成对象
+  voltage: "",
+  max_pressure: { min: "", max: "" },       // 保持对象
   current_inventory: 0,
-  category: "",
-  type: "",
-  form_factor: "",
-  nominal_size: "",
-  connection_type: "",
-  construction: "",
-  kv_value: "",
-  switching_function: "",
-  control: "",
-  material: "",
-  sealing: "",
-  voltage_tolerance: "",
-  power_consumption: "",
-  duty_cycle: "",
-  protection_class: "",
-  medium: "",
-  medium_temperature: "",
-  ambient_temperature: "",
-  installation_position: "",
-  src: ""
+  inner_diameter: "",                        // 对应 decimal(5,2)
+  temperature_range: { min: "", max: "" },   // 保持对象
 });
+
 //能修复uncontrolled → controlled bug 
 
 setOnProductEdit(false)
@@ -277,7 +367,7 @@ setOnCoilEdit(false)
 };
 
 const handleProductDelete = async (id) => {
-  if (!confirm("Delete this product?")) return;
+  if (!confirm("您确定要删除该阀体吗?")) return;
   await fetch(`/api/products`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
@@ -288,12 +378,44 @@ const handleProductDelete = async (id) => {
 
 
 const handleLogSubmit = async () => {
-  // 用 model_id 匹配 coil
-  const productModelId = products.find(p => p.id === +logForm.product_id)?.model_id;
+  // 必填字段校验
+  if (!logForm.mode) {
+    alert("请选择出入账模式");
+    return;
+  }
+  if (!logForm.product_id) {
+    alert("请选择型号");
+    return;
+  }
+  if (!logForm.action) {
+    alert("请选择进货/出货");
+    return;
+  }
+  if (!logForm.quantity) {
+    alert("请输入数量");
+    return;
+  }
+  if (logForm.mode !== "product" && !logForm.voltage) {
+    alert("请选择电压");
+    return;
+  }
+  if (!logForm.company_sold_to) {
+    alert(logForm.action === "IN" ? "请输入进货对象" : "请输入售卖对象");
+    return;
+  }
+  // 用 model_number 匹配 coil
+  const productModelId = products.find(p => p.id === +logForm.product_id)?.model_number;
   const matchedCoil = coil.find(c =>
-    c.model_id === productModelId &&
+    c.name === productModelId &&
     c.voltage?.trim().toLowerCase() === logForm.voltage?.trim().toLowerCase()
   );
+  //console.log("Matched Coil:",matchedCoil)
+  
+  // 如果没找到 matchedCoil，则报错并退出
+  if ((logForm.mode === "coil" || logForm.mode === "both") && !matchedCoil) {
+    alert("未找到对应的 Coil，请检查型号和电压！");
+    return;
+  }
 
   const logToSubmit = { ...logForm, coil_id: matchedCoil ? matchedCoil.id : null };
   const method = logForm.id ? "PUT" : "POST";
@@ -305,6 +427,7 @@ const handleLogSubmit = async () => {
   });
 
   if (res.ok) {
+    alert("操作成功")
     const quantityChange = logForm.action === "IN" ? logForm.quantity : -logForm.quantity;
 
     // 根据 mode 更新对应 state
@@ -329,7 +452,7 @@ const handleLogSubmit = async () => {
     }
 
     // 重置表单
-    setLogForm({ id: "", product_id: "", action: "IN", quantity: 0, voltage: "", company_sold_to: "", coil_id: null, mode: "" });
+    setLogForm({ id: "", product_id: "", action: "IN", quantity: 0, voltage: "", company_sold_to: "", coil_id: null, mode: "" ,export_price:"",export_price:""});
 
     // 更新日志
     fetchInventoryLog();
@@ -338,16 +461,29 @@ const handleLogSubmit = async () => {
 
 const handleLogDelete = async (id) => {
   if (!id) return alert("Missing log id");
-  if (!confirm("Delete this log?")) return;
-  await fetch("/api/inventory_log", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id }),
-  });
-  setLogForm({ id: "", product_id: "", action: "IN", quantity: 0, voltage: "", company_sold_to: "" });
-  fetchInventoryLog();
-  fetchProducts();
+  if (!confirm("您确定要删除该账目吗?")) return;
+
+  try {
+    const res = await fetch("/api/inventory_log", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+
+    if (res.ok) {
+      alert("删除成功");
+      setLogForm({ id: "", product_id: "", action: "IN", quantity: 0, voltage: "", company_sold_to: "", import_price: "", export_price: "" });
+      fetchInventoryLog();
+      fetchProducts();
+    } else {
+      const data = await res.json();
+      alert(`删除失败: ${data.error || "未知错误"}`);
+    }
+  } catch (err) {
+    alert(`删除失败: ${err.message}`);
+  }
 };
+
 
 function formatDate(date) {
   const d = new Date(date);
@@ -375,6 +511,9 @@ const handleImageUpload = async (e) => {
     setProductForm({ ...productForm, src: data.url });
   }
 };
+
+
+
 
 
   return (
@@ -424,7 +563,7 @@ const handleImageUpload = async (e) => {
                   {/* Company Filter Dropdown */}
                   <div className="mb-2">
                     <select
-                      value={selectedCompany}
+                      value={selectedCompany || ""}
                       onChange={(e) => setSelectedCompany(e.target.value)}
                       className="p-2 rounded bg-zinc-900 text-white"
                     >
@@ -486,9 +625,8 @@ const handleImageUpload = async (e) => {
                               <span className="w-36"><strong>{p.name}</strong></span>
                               <span className="w-20">库存: {p.current_inventory}</span>
                               <span className="w-24">型号:<br/>{p.model_number}</span>
-                              <span className="w-20">内径: {p.inner_diameter ?? "-"}</span>
+                              <span className="w-20">内径: {p.inner_diameter ?? "-"}mm</span>
                               <span className="w-24">温度范围: {p.temperature_range ?? "-"}</span>
-                              <span className="w-20">出售价格: {p.price ?? "-"}<br/> Euro</span>
                               <span className="w-28">最大压力: {p.max_pressure ?? "-"}</span>
                               <span className="w-24">连接: {p.connection ?? "-"}</span>
                             </div>
@@ -537,43 +675,42 @@ const handleImageUpload = async (e) => {
                     )}
                   {fields.slice(startIndex, startIndex + 4).map((field, i) => {
                       // 新产品名
+
+                      const valveTypes = [
+                        "气动角座阀",
+                        "单向阀",
+                        "液氮过滤器",
+                        "安全阀",
+                        "离心泵",
+                        "电磁泵",
+                        "压力传感器",
+                        "压力开关",
+                        "压力表",
+                        "温度表",
+                        "水用电磁阀",
+                        "二位三通电磁阀",
+                        "高压电磁阀",
+                        "真空电磁阀",
+                        "常开电磁阀",
+                        "防爆电磁阀",
+                        "低温电磁阀",
+                        "高温电磁阀"
+                      ];
                       if (field.name === "name") {
                         return (
                           <select
                             key={i}
-                            value={productForm.name}
+                            value={productForm.name || ""}
                             onChange={(e) =>
                               setProductForm({ ...productForm, name: e.target.value })
                             }
-                            className="p-2 rounded bg-zinc-900 text-white w-35"
+                            className="p-2 rounded bg-zinc-900 text-white w-36"
                           >
                             <option value="" disabled>选择阀门类型</option>
-                            {[...new Set(products.map(p => p.name))].map((name, idx) => (
-                              <option key={idx} value={name}>{name}</option>
+                            {valveTypes.map((type, idx) => (
+                              <option key={idx} value={type}>{type}</option>
                             ))}
                           </select>
-
-                        );
-                      }
-
-                      // 价格
-                      if (field.name === "price") {
-                        return (
-                          <div key={i} className="flex gap-1 items-center">
-                            <input
-                              type="number"
-                              min={0}
-                              value={productForm.price}
-                              placeholder="价格"
-                              className="p-2 rounded bg-zinc-900 text-white w-35"
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (+val < 0) { alert("价格必须是非负数字"); return; }
-                                setProductForm({ ...productForm, price: val });
-                              }}
-                            />
-                            <span className="text-gray-400">euro</span>
-                          </div>
                         );
                       }
 
@@ -758,7 +895,7 @@ const handleImageUpload = async (e) => {
                   {/* Manufacturer Filter Dropdown */}
                   <div className="mb-2">
                     <select
-                      value={selectedCompany}
+                      value={selectedCompany || ""}
                       onChange={(e) => setSelectedCompany(e.target.value)}
                       className="p-2 rounded bg-zinc-900 text-white"
                     >
@@ -842,9 +979,19 @@ const handleImageUpload = async (e) => {
 
                   {/* Coil Form */}
                   <div className="flex flex-col gap-2 mt-2">
+                     {onCoilEdit && (
+                      <div className=" z-50">
+                        <button
+                          className="bg-red-600 px-3 py-1 rounded shadow hover:bg-red-500 transition"
+                          onClick={() => setOnCoilEdit(false)}
+                        >
+                          取消编辑
+                        </button>
+                      </div>
+                    )}
                     <select
                       name="name"
-                      value={coilForm.name}
+                      value={coilForm.name || ""}
                       onChange={(e) => handleChange(e, "coil")}
                       className="p-2 rounded bg-zinc-900 text-white w-35"
                     >
@@ -891,7 +1038,7 @@ const handleImageUpload = async (e) => {
                     min={0}
                     step={1}
                   />
-                    <select name="manufacturer" value={coilForm.manufacturer} onChange={(e) => handleChange(e, "coil")} className="p-2 rounded bg-zinc-900 text-white w-35">
+                    <select name="manufacturer" value={coilForm.manufacturer || ""} onChange={(e) => handleChange(e, "coil")} className="p-2 rounded bg-zinc-900 text-white w-35">
                       <option value="" disabled hidden>选择生产商</option>
                       <option value="ceme">CEME</option>
                       <option value="jaksa">JAKSA</option>
@@ -933,16 +1080,17 @@ const handleImageUpload = async (e) => {
                   onClick={() => fetchInventoryLog(searchDate)}
                   className="bg-blue-600 px-4 py-2 rounded"
                 >
-                  Filter
+                  筛选
                 </button>
                 <button
                   onClick={() => { setSearchDate(""); fetchInventoryLog(""); }}
                   className="bg-gray-600 px-4 py-2 rounded"
                 >
-                  Deselect
+                  取消筛选
                 </button>
             </div>
-
+            
+            
           <ul className="space-y-2 overflow-auto max-h-117">
             {inventoryLog.map((entry) => {
               const product = products.find(p => p.id === entry.product_id) || {}; //all products with matching pid (id == logentry.product_id)
@@ -952,15 +1100,28 @@ const handleImageUpload = async (e) => {
 
               //console.log("matching coil for log entry:", entry.id, entry.coil_id, entryCoil);
               {(entry.voltage || entryCoil.voltage) && <>Voltage: {entry.voltage || entryCoil.voltage} | </>}
+              
+              const modeMap = {
+                product: "仅阀体",
+                coil: "仅线圈",
+                both: "一套",
+              };
 
+              const actionMap = {
+                IN: "进货",
+                OUT: "售卖",
+              };
+
+              const preposition = entry.action === "IN" ? "从" : "给";
+              const price = entry.action === 'IN' ? entry.import_price : entry.export_price;
               return (
                 <li key={entry.id} className="border-b border-zinc-700 pb-1 flex flex-col gap-1">
                   <div className="flex justify-between items-center">
                     <span>
-                      <strong>{product.model_number}</strong>— {product.name} | 操作：{entry.action} {entry.quantity}个 | 日期：{formatDate(entry.action_date)} | 售卖对象: {entry.company_sold_to || "N/A"} 
+                      在 {formatDate(entry.action_date)} {preposition} {entry.company_sold_to || "未填写"}，{actionMap[entry.action]} {entry.quantity}个 {product.model_number}（{product.name}，{modeMap[entry.mode] || ""}）金额为：{price*entry.quantity}元
                     </span>
                     <div className="flex gap-2">
-                      <button className="bg-yellow-600 px-2 rounded" onClick={() => setLogForm(entry)}>Edit</button>
+                      {!onLogEdit && (<button className="bg-yellow-600 px-2 rounded" onClick={() => {setLogForm(entry);setOnLogEdit(true)}}>Edit</button>)}
                       <button className="bg-red-600 px-2 rounded" onClick={() => handleLogDelete(entry.id)}>Delete</button>
                     </div>
                   </div>
@@ -978,19 +1139,29 @@ const handleImageUpload = async (e) => {
 
           {/* 添加/编辑 log */}
           <div className="flex flex-col gap-2 mt-2">
+             {onLogEdit && (
+                <div className=" z-50">
+                    <button
+                      className="bg-red-600 px-3 py-1 rounded shadow hover:bg-red-500 transition"
+                      onClick={() => setOnLogEdit(false)}
+                    >
+                    取消编辑
+                  </button>
+                </div>
+            )}
             {/* Mode Selector */}
-            <select name="mode" value={logForm.mode} onChange={(e)=>handleChange(e,"log")} className="p-2 rounded bg-zinc-900 text-white">
+            <select name="mode" value={logForm.mode || ""} onChange={(e)=> {handleChange(e,"log")}} className="p-2 rounded bg-zinc-900 text-white">
               <option value="" disabled>请选择出入账模式</option>
                <option value="product">仅进/出货阀体</option>
               <option value="coil">仅进/出货线圈</option>
               <option value="both">进/出货一套阀体+线圈 </option>
             </select>
             {/* product id is auto filled in here */}
-            <select name="product_id" value={logForm.product_id} onChange={(e)=>handleChange(e,"log")} className="p-2 rounded bg-zinc-900 text-white">
+            <select name="product_id" value={logForm.product_id || ""} onChange={(e)=>handleChange(e,"log")} className="p-2 rounded bg-zinc-900 text-white">
               <option value="">选择型号</option>
               {products.map((p)=> <option key={p.id} value={p.id}>{p.model_number}</option>)}
             </select>
-            <select name="action" value={logForm.action} onChange={(e)=>handleChange(e,"log")} className="p-2 rounded bg-zinc-900 text-white">
+            <select name="action" value={logForm.action || ""} onChange={(e)=>handleChange(e,"log")} className="p-2 rounded bg-zinc-900 text-white">
               <option value="IN">进货</option>
               <option value="OUT">出货</option>
             </select>
@@ -1010,7 +1181,7 @@ const handleImageUpload = async (e) => {
 
             {/* voltage 选择框 */}
             {logForm.mode !== "product" && (
-              <select name="voltage" value={logForm.voltage} onChange={(e)=>handleChange(e,"log")} className="p-2 rounded bg-zinc-900 text-white">
+              <select name="voltage" value={logForm.voltage || ""} onChange={(e)=>handleChange(e,"log")} className="p-2 rounded bg-zinc-900 text-white">
                 <option value="">选择线圈电压：</option>
                 {[...new Set(coil.map(c => c.voltage).filter(v => v))].map((v, i) => (  
                   <option key={i} value={v}>{v}</option>
@@ -1040,8 +1211,39 @@ const handleImageUpload = async (e) => {
               />
             )}
 
+            {/* 进货价格 */}
+            {logForm.action === "IN" && (
+              <input
+                type="number"
+                name="import_price"
+                value={logForm.import_price || ""}
+                onChange={(e) => handleChange(e, "log")}
+                placeholder="进货价格:单价，单位元"
+                className="p-2 rounded bg-zinc-900 text-white"
+                min={0}
+                step={0.01}
+              />
+            )}
+
+            {/* 售卖价格 */}
+            {logForm.action === "OUT" && (
+              <input
+                type="number"
+                name="export_price"
+                value={logForm.export_price || ""}
+                onChange={(e) => handleChange(e, "log")}
+                placeholder="售卖价格"
+                className="p-2 rounded bg-zinc-900 text-white"
+                min={0}
+                step={0.01}
+              />
+            )}
+
+
+
+
             <button className={`p-2 rounded ${logForm.id ? "bg-blue-600" : "bg-green-600"}`} onClick={handleLogSubmit}>
-              {logForm.id ? "Update Log" : "Add Log"}
+              {logForm.id ? "更新账目" : "添加账目"}
             </button>
           </div>
         </div>
@@ -1120,33 +1322,101 @@ const handleImageUpload = async (e) => {
                 </select>
               </>
             )}
-            <button className="bg-blue-600 px-4 py-2 rounded" onClick={() => generateReport(reportType, reportValue)}>Generate</button>
+            <button className="bg-blue-600 px-4 py-2 rounded" onClick={() => generateReport(reportType, reportValue)}>生成报表</button>
           </div>
 
           {/* Report Table */}
-          <table className="w-full text-left border border-zinc-700">
-            <thead>
-              <tr className="border-b border-zinc-700">
-                <th className="px-2 py-1">产品</th>
-                <th className="px-2 py-1">售卖数量</th>
-                <th className="px-2 py-1">销售额/Euro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reportData.map((r,i) => (
-                <tr key={i} className="border-b border-zinc-700">
-                  <td className="px-2 py-1">{r.product_name}</td>
-                  <td className="px-2 py-1">{r.quantity}</td>
-                  <td className="px-2 py-1">{(r.quantity * Number(r.price)).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div id="report-container">
+        {/* 按 manufacturer 分组 + 分页 + 合计 */}
+        {Object.entries(
+          reportData.reduce((acc, r) => {
+            const product = products.find(p => p.model_number == r.product_name);
+            const manufacturer = product?.manufacturer || "未知厂商";
+            console.log("product:",product)
+            console.log("manufacturer:",manufacturer)
+            if (!acc[manufacturer]) acc[manufacturer] = [];
+            acc[manufacturer].push(r);
+            return acc;
+          }, {})
+        ).map(([manufacturer, data]) => {
+          // 独立分页变量
+          var pageSizeVar = 10; // 每页行数，可改
+          var currentPageVar = 1; // 默认页
+          var startIndexVar = (currentPageVar - 1) * pageSizeVar;
+
+          var paginatedDataVar = data.slice(startIndexVar, startIndexVar + pageSizeVar);
+
+          // 表格 JSX
+          var reportTable = (
+            <div key={manufacturer} className="mb-8">
+              <h2 className="text-lg font-bold mb-2">{manufacturer}</h2>
+
+              <table className="w-full text-left border border-zinc-700">
+                <thead>
+                  <tr className="border-b border-zinc-700">
+                    <th className="px-2 py-1">序列</th>
+                    <th className="px-2 py-1">名称</th>
+                    <th className="px-2 py-1">型号</th>
+                    <th className="px-2 py-1">电压</th>
+                    <th className="px-2 py-1">售卖数量</th>
+                    <th className="px-2 py-1">购买公司</th>
+                    <th className="px-2 py-1">销售额/元</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedDataVar.map((r, i) => (
+                    <tr key={i} className="border-b border-zinc-700">
+                      <td className="px-2 py-1">{i + 1}</td>
+                      <td className="px-2 py-1">{r.product_type}</td>
+                      <td className="px-2 py-1">{r.product_name}</td>
+                      <td className="px-2 py-1">{r.voltage}</td>
+                      <td className="px-2 py-1">{r.quantity}</td>
+                      <td className="px-2 py-1">{r.company_sold_to}</td>
+                      <td className="px-2 py-1">{r.sales}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-zinc-700 font-bold">
+                    <td colSpan={4} className="px-2 py-1">合计</td>
+                    <td className="px-2 py-1">{data.reduce((sum, r) => sum + r.quantity, 0)}</td>
+                    <td></td>
+                    <td className="px-2 py-1">{data.reduce((sum, r) => sum + r.sales, 0)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* 分页按钮 */}
+              {Math.ceil(data.length / pageSizeVar) > 1 && (
+                <div className="mt-2 flex justify-center gap-2">
+                  <button
+                    disabled={currentPageVar === 1}
+                    onClick={() => currentPageVar--}
+                    className="px-2 py-1 border rounded disabled:opacity-50"
+                  >
+                    上一页
+                  </button>
+                  <span>{currentPageVar} / {Math.ceil(data.length / pageSizeVar)}</span>
+                  <button
+                    disabled={currentPageVar === Math.ceil(data.length / pageSizeVar)}
+                    onClick={() => currentPageVar++}
+                    className="px-2 py-1 border rounded disabled:opacity-50"
+                  >
+                    下一页
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+
+          return reportTable;
+        })}
+        </div>
         </div>
 
         {/* Best Seller Chart */}
         <div className="bg-zinc-800 rounded-xl p-4 mt-6">
-          <h2 className="text-lg font-semibold mb-2">Top 5 Best Seller</h2>
+          <h2 className="text-lg font-semibold mb-2">前五最畅销产品</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
               data={bestSellers}
@@ -1167,7 +1437,7 @@ const handleImageUpload = async (e) => {
 
         {/* Top Companies Chart */}
         <div className="bg-zinc-800 rounded-xl p-4 mt-6">
-          <h2 className="text-lg font-semibold mb-2 text-white">Top Companies</h2>
+          <h2 className="text-lg font-semibold mb-2 text-white">前五购买最多的公司</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
               data={(() => {
