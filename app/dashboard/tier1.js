@@ -568,7 +568,7 @@ const handleImageUpload = async (e) => {
             animate={{ y: 0 }}
             exit={{ y: "-100%" }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="fixed   inset-0 z-40 bg-black z-[999]"
+            className="fixed  overflow-y-auto inset-0 z-40 bg-black z-[999]"
           >
 
             {/* Content */}
