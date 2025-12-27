@@ -54,11 +54,13 @@ const [selectedCompany, setSelectedCompany] = React.useState(""); // 默认显�
 
 const [imagePreview, setImagePreview] = useState(null);
 
- const [menuOpen, setMenuOpen] = useState(false);
+const [menuOpen, setMenuOpen] = useState(false);
 
 const [onProductEdit, setOnProductEdit] = useState(false);
 const [onCoilEdit, setOnCoilEdit] = useState(false);
 const [onLogEdit, setOnLogEdit] = useState(false);
+
+const [popupProduct, setPopupProduct] = useState(null);
 
 const fields = [
   { name: "name", placeholder: "新产品名" },
@@ -513,12 +515,9 @@ const handleImageUpload = async (e) => {
 };
 
 
-
-
-
   return (
-    <div className="min-h-screen p-10 bg-black text-white">
-      <h1 className="text-2xl font-bold mb-6">科延自动化库存管理系统</h1>
+    <div className="min-h-screen md:p-10 bg-black text-white overflow-x-hidden px-4 ">
+      <h1 className="text-2xl font-bold mb-6 mt-5 ">科延自动化库存管理系统</h1>
       {/* Curtain Menu ICON DIV*/}
       <div className="fixed top-4 right-4 z-[9999]">
         <button
@@ -542,6 +541,7 @@ const handleImageUpload = async (e) => {
           
         </button>
       </div>
+
        {/* Fullscreen Curtain Menu */}
       <AnimatePresence>
         {menuOpen && (
@@ -550,14 +550,14 @@ const handleImageUpload = async (e) => {
             animate={{ y: 0 }}
             exit={{ y: "-100%" }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="fixed inset-0 z-40 bg-black z-[999]"
+            className="fixed overflow-y-auto  inset-0 z-40 bg-black z-[999]"
           >
 
             {/* Content */}
-            <div className="h-full grid grid-cols-2 gap-6 p-8  ">
-              <div className="bg-zinc-900 rounded-lg overflow-y-auto">
+            <div className="h-full grid grid-cols-1 md:grid-cols-2 gap-6 md:p-8 md:w-full">
+              <div className="bg-zinc-900 rounded-lg md:overflow-y-auto">
                 {/* Product Inventory */}
-                <div className="bg-zinc-800 rounded-xl p-4 overflow-auto flex flex-col gap-4">
+                <div className="bg-zinc-800 rounded-xl p-4 overflow-x-hidden md:overflow-auto flex flex-col md:gap-4 gap-5">
                   <h2 className="text-lg font-semibold mb-2">阀体库存</h2>
 
                   {/* Company Filter Dropdown */}
@@ -578,91 +578,97 @@ const handleImageUpload = async (e) => {
 
                   {/* Search Bar */}
 
-                  <div className="flex gap-2 mb-2">
+                  <div className="flex flex-col md:flex-row gap-2 mb-2">
                     <input
                       type="text"
                       placeholder="按阀体型号搜索..."
                       value={searchProduct}
                       onChange={(e) => setSearchProduct(e.target.value)}
-                      className="p-2 rounded bg-zinc-900 text-white flex-1"
+                      className="p-2 rounded bg-zinc-900 text-white md:flex-1 min-w-0 w-[30%]"
                     />
-                    <button 
-                      onClick={() => {
-                        fetchProducts(searchProduct);
-                        setIsSearching(true);
-                      }} 
-                      className="bg-blue-600 px-4 py-2 rounded"
-                    >
-                      搜索
-                    </button>
-                    
-                    {isSearching && (
-                      <button 
-                        onClick={() => { 
-                          setSearchProduct("");
-                          setIsSearching(false);
-                          fetch(`/api/products`)
-                            .then(res => res.json())
-                            .then(data => setProducts(data));
-                        }} 
-                        className="bg-gray-600 px-4 py-2 rounded"
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          fetchProducts(searchProduct);
+                          setIsSearching(true);
+                        }}
+                        className="bg-blue-600 md:px-4 md:py-2 py-1 px-3 rounded md:flex-none"
                       >
-                        取消搜索
+                        搜索
                       </button>
-                    )}
+
+                      {isSearching && (
+                        <button
+                          onClick={() => {
+                            setSearchProduct("");
+                            setIsSearching(false);
+                            fetch(`/api/products`)
+                              .then(res => res.json())
+                              .then(data => setProducts(data));
+                          }}
+                          className="bg-gray-600 px-4 py-2 rounded  md:flex-none"
+                        >
+                          取消
+                        </button>
+                      )}
+                    </div>
                   </div>
 
+
                   {/* Product List */}
-                  <div className="overflow-x-auto">
-                    <ul className="space-y-4 max-h-100 overflow-y-auto min-w-max">
+                    <div className="md:overflow-x-auto">
+                    <ul className="space-y-4 max-h-100 overflow-y-auto md:min-w-max">
                       {products
                         .filter(p => !selectedCompany || p.manufacturer === selectedCompany)
-                        .map((p) => (
-                          <li key={p.id} className="border-b border-zinc-700 pb-1 flex gap-4 items-center min-w-max">
+                        .map(p => (
+                          <li
+                            key={p.id}
+                            className="border-b border-zinc-700 pb-2 flex flex-col md:flex-row gap-1 md:gap-4 items-start md:items-center md:min-w-max"
+                          >
                             <img src={p.src} alt={p.name} className="w-20 h-20 object-cover rounded" />
 
-                            <div className="flex gap-4 min-w-max">
-                              <span className="w-36"><strong>{p.name}</strong></span>
-                              <span className="w-20">库存: {p.current_inventory}</span>
-                              <span className="w-24">型号:<br/>{p.model_number}</span>
-                              <span className="w-20">内径: {p.inner_diameter ?? "-"}mm</span>
-                              <span className="w-24">温度范围: {p.temperature_range ?? "-"}</span>
-                              <span className="w-28">最大压力: {p.max_pressure ?? "-"}</span>
-                              <span className="w-24">连接: {p.connection ?? "-"}</span>
+                            <div className="flex flex-wrap md:gap-2 md:min-w-max w-[80%]">
+                              <span className="md:w-24 w-1/3"><strong>{p.name}</strong></span>
+                              <span className="md:w-22 w-1/3">型号:<br/>{p.model_number}</span>
+                              <span className="md:w-26 w-1/3">库存: {p.current_inventory}</span>
+
+
+                              <span className="hidden md:block w-20">内径: {p.inner_diameter ?? "-" }mm</span>
+                              <span className="hidden md:block w-24">温度范围: {p.temperature_range ?? "-"}</span>
+                              <span className="hidden md:block w-28">最大压力: {p.max_pressure ?? "-"}</span>
+                              <span className="hidden md:block w-24">连接: {p.connection ?? "-"}</span>
                             </div>
 
-                            <div className="flex gap-2 ml-auto">
-                              {!onProductEdit &&(<button
-                                className="bg-yellow-600 px-2 rounded"
-                                onClick={() => {
-                                  setOnProductEdit(true); // 开启编辑
-                                  setProductForm({
-                                    ...p,
-                                  
-                                    max_pressure: p.max_pressure ? (() => {
-                                      const [min, max] = p.max_pressure.split("bar-");
-                                      return { min, max };
-                                    })() : { min: "", max: "" },
-                                    temperature_range: p.temperature_range ? (() => {
-                                      const [min, max] = p.temperature_range.split("℃-");
-                                      return { min, max };
-                                    })() : { min: "", max: "" }
-                                  });
-                                }}
+                           <div className="flex gap-2 mt-2 md:mt-0 md:ml-auto">
+                              {!onProductEdit && (
+                                <button
+                                  className="bg-yellow-600 px-3 py-1.5 md:px-2 md:py-1 rounded w-auto text-sm md:text-xs"
+                                  onClick={() => {
+                                    setOnProductEdit(true);
+                                    setProductForm({ ...p });
+                                  }}
+                                >
+                                  编辑
+                                </button>
+                              )}
+                              <button
+                                className="bg-red-600 px-3 py-1.5 md:px-2 md:py-1 rounded w-auto text-sm md:text-xs"
+                                onClick={() => handleProductDelete(p.id)}
                               >
-                                编辑
-                              </button>)}
-
-                              <button className="bg-red-600 px-2 rounded" onClick={() => handleProductDelete(p.id)}>删除</button>
+                                删除
+                              </button>
                             </div>
+
                           </li>
                         ))}
                     </ul>
-                  </div>
+
+                    </div>
 
 
                   {/* Product Form */}
-                  <div className="flex flex-col gap-2 mt-2">
+                  <div className="flex flex-col gap-2 mt-2 ">
                     {onProductEdit && (
                       <div className=" z-50">
                         <button
@@ -852,7 +858,7 @@ const handleImageUpload = async (e) => {
                       )}
 
                       <button
-                        className={`p-2 rounded ${
+                        className={`w-[25%] p-2 rounded ${
                           onProductEdit && productForm.id ? "bg-blue-600" : "bg-green-600"
                         }`}
                         onClick={() => {
@@ -874,13 +880,14 @@ const handleImageUpload = async (e) => {
                       >
                         上一页
                       </button>
-                      <button
-                        disabled={startIndex + 4 >= fields.length}
-                        onClick={() => setStartIndex(startIndex + 4)}
-                        className="bg-gray-600 px-4 py-2 rounded"
-                      >
-                        下一页
-                      </button>
+                      {startIndex + 4 < fields.length && (
+                        <button
+                          onClick={() => setStartIndex(startIndex + 4)}
+                          className="bg-gray-600 px-4 py-2 rounded"
+                        >
+                          下一页
+                        </button>
+                      )}
 
                     </div>
                   </div>
@@ -889,7 +896,7 @@ const handleImageUpload = async (e) => {
 
               <div className="bg-zinc-900 rounded-lg overflow-y-auto">
                   {/* Coil Inventory */}
-                <div className="bg-zinc-800 rounded-xl p-4 overflow-auto flex flex-col gap-4">
+                <div className="bg-zinc-800 rounded-xl p-4 overflow-auto flex flex-col md:gap-4">
                   <h2 className="text-lg font-semibold mb-2">线圈库存</h2>
 
                   {/* Manufacturer Filter Dropdown */}
@@ -909,13 +916,13 @@ const handleImageUpload = async (e) => {
                   </div>
 
                   {/* Search Bar */}
-                  <div className="flex gap-2 mb-2">
+                  <div className="flex flex-col md:flex-row gap-2 mb-2">
                       <input
                         type="text"
                         placeholder="按线圈对应的阀体型号搜索..."
                         value={searchCoil}
                         onChange={(e) => setSearchCoil(e.target.value)}
-                        className="p-2 rounded bg-zinc-900 text-white flex-1"
+                        className="p-2 rounded bg-zinc-900 text-white md:flex-1 min-w-0 w-[30%]"
                       />
                       <button 
                         onClick={() => {
@@ -925,7 +932,7 @@ const handleImageUpload = async (e) => {
 
                           setIsCoilSearching(true);
                         }} 
-                        className="bg-blue-600 px-4 py-2 rounded"
+                        className="bg-blue-600 md:px-4 md:py-2 rounded md:flex-none w-[10%]"
                       >
                         搜索
                       </button>
@@ -946,36 +953,36 @@ const handleImageUpload = async (e) => {
                       )}
                   </div>
 
-                  {/* Coil List */}
-                  <ul className="space-y-2 overflow-auto max-h-100">
-                    {coil
-                      .filter(c => !selectedCompany || c.manufacturer === selectedCompany)
-                      .map((c) => (
-                        
-                        <li key={c.id} className="border-b border-zinc-700 pb-1 flex justify-between items-center">
+                {/* Coil List */}
+                <ul className="space-y-2 overflow-auto max-h-100">
+                  {coil
+                    .filter(c => !selectedCompany || c.manufacturer === selectedCompany)
+                    .map((c) => (
+                      <li key={c.id} className="border-b border-zinc-700 pb-1 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                        {/* 信息字段 */}
+                        <div className="flex flex-col sm:flex-row sm:gap-4">
                           <span><strong>{c.name}</strong> — 库存: {c.inventory}</span>
                           {c.voltage && <span>电压: {c.voltage}</span>}
                           <span>制造商: {c.manufacturer}</span>
-                          <div className="flex gap-2">
-                            {!onCoilEdit&&
-                            (<button className="bg-yellow-600 px-2 rounded" 
-                              onClick={() => 
-                              {
-                              setOnCoilEdit(true)
-                              setCoilForm(c)
-                              
-                              }
-                              }>
+                        </div>
+                        {/* 按钮 */}
+                        <div className="flex gap-2 flex-wrap">
+                          {!onCoilEdit && (
+                            <button className="bg-yellow-600 px-2 rounded"
+                              onClick={() => {
+                                setOnCoilEdit(true)
+                                setCoilForm(c)
+                              }}>
                               编辑
                             </button>
-                            
-                            )}
-                            <button className="bg-red-600 px-2 rounded" onClick={() => handleCoilDelete(c.id)}>删除</button>
-                          </div>
-                        </li>
-                      ))
-                    }
-                  </ul>
+                          )}
+                          <button className="bg-red-600 px-2 rounded" onClick={() => handleCoilDelete(c.id)}>删除</button>
+                        </div>
+                      </li>
+                    ))
+                  }
+                </ul>
+
 
                   {/* Coil Form */}
                   <div className="flex flex-col gap-2 mt-2">
@@ -1046,7 +1053,7 @@ const handleImageUpload = async (e) => {
                       <option value="rotork">ROTORK</option>
                       <option value="goetvalve">GOETVALVE</option>
                     </select>
-                    <button className={`p-2 rounded ${coilForm.id ? "bg-blue-600" : "bg-green-600"}`} onClick={handleCoilSubmit}>
+                    <button className={`w-[15%] p-2 rounded ${coilForm.id ? "bg-blue-600" : "bg-green-600"}`} onClick={handleCoilSubmit}>
                       {coilForm.id ? "更新线圈" : "添加线圈"}
                     </button>
                   </div>
@@ -1058,37 +1065,38 @@ const handleImageUpload = async (e) => {
       </AnimatePresence>
 
       {/* Main Dashboard */}
-      <div className="grid grid-cols-2 gap-6 ">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
 
         {/* Inventory Log */}
         <div className="bg-zinc-800 rounded-xl p-4 flex flex-col gap-4 ">
           <h2 className="text-lg font-semibold mb-2">库存流水明细</h2>
-            <div className="flex gap-2 mb-2">
-                <input
-                  type="date"
-                  value={searchDate}
-                  onChange={(e) => setSearchDate(e.target.value)}
-                  className="p-2 rounded bg-zinc-900 text-white w-44 cursor-pointer"
-                  style={{
-                    colorScheme: 'dark', // 让浏览器用深色日历
-                    WebkitAppearance: 'textfield', // Chrome/Edge
-                    MozAppearance: 'textfield',     // Firefox
-                    appearance: 'textfield',
-                  }}
-                />
-                <button
-                  onClick={() => fetchInventoryLog(searchDate)}
-                  className="bg-blue-600 px-4 py-2 rounded"
-                >
-                  筛选
-                </button>
-                <button
-                  onClick={() => { setSearchDate(""); fetchInventoryLog(""); }}
-                  className="bg-gray-600 px-4 py-2 rounded"
-                >
-                  取消筛选
-                </button>
-            </div>
+          <div className="flex flex-col sm:flex-row gap-2 mb-2">
+            <input
+              type="date"
+              value={searchDate}
+              onChange={(e) => setSearchDate(e.target.value)}
+              className="p-2 rounded bg-zinc-900 text-white w-full sm:w-44 text-sm sm:text-base cursor-pointer"
+              style={{
+                colorScheme: 'dark',
+                WebkitAppearance: 'textfield',
+                MozAppearance: 'textfield',
+                appearance: 'textfield',
+              }}
+            />
+            <button
+              onClick={() => fetchInventoryLog(searchDate)}
+              className="bg-blue-600 px-3 py-2 sm:px-4 sm:py-2 rounded text-sm sm:text-base w-[20%] sm:w-auto"
+            >
+              筛选
+            </button>
+            <button
+              onClick={() => { setSearchDate(""); fetchInventoryLog(""); }}
+              className="bg-gray-600 px-3 py-2 sm:px-4 sm:py-2 rounded text-sm sm:text-base w-[20%] sm:w-auto"
+            >
+              取消
+            </button>
+          </div>
+
             
             
           <ul className="space-y-2 overflow-auto max-h-117">
@@ -1115,24 +1123,26 @@ const handleImageUpload = async (e) => {
               const preposition = entry.action === "IN" ? "从" : "给";
               const price = entry.action === 'IN' ? entry.import_price : entry.export_price;
               return (
-                <li key={entry.id} className="border-b border-zinc-700 pb-1 flex flex-col gap-1">
-                  <div className="flex justify-between items-center">
-                    <span>
-                      在 {formatDate(entry.action_date)} {preposition} {entry.company_sold_to || "未填写"}，{actionMap[entry.action]} {entry.quantity}个 {product.model_number}（{product.name}，{modeMap[entry.mode] || ""}）金额为：{price*entry.quantity}元
-                    </span>
-                    <div className="flex gap-2">
-                      {!onLogEdit && (<button className="bg-yellow-600 px-2 rounded" onClick={() => {setLogForm(entry);setOnLogEdit(true)}}>Edit</button>)}
-                      <button className="bg-red-600 px-2 rounded" onClick={() => handleLogDelete(entry.id)}>Delete</button>
-                    </div>
-                  </div>
-                  <div className="text-sm text-zinc-300">
-                    {product.connection && <>连接: {product.connection} | </>}
-                    {entryCoil.voltage && <>电压: {entryCoil.voltage} | </>}
-                    {product.max_pressure && <>压力范围: {product.max_pressure} | </>}
-                    {product.medium_temperature && <>温度范围: {product.medium_temperature}</>}
-        
-                  </div>
-                </li>
+<li key={entry.id} className="border-b border-zinc-700 pb-1 flex flex-col gap-1 text-sm sm:text-base">
+  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+    <span className="break-words">
+      在 {formatDate(entry.action_date)} {preposition} {entry.company_sold_to || "未填写"}，{actionMap[entry.action]} {entry.quantity}个 {product.model_number}（{product.name}，{modeMap[entry.mode] || ""}）金额为：{price*entry.quantity}元
+    </span>
+    <div className="flex gap-2 mt-1 sm:mt-0 flex-wrap">
+      {!onLogEdit && (
+        <button className="bg-yellow-600 px-2 rounded text-xs sm:text-sm" onClick={() => {setLogForm(entry);setOnLogEdit(true)}}>编辑</button>
+      )}
+      <button className="bg-red-600 px-2 rounded text-xs sm:text-sm" onClick={() => handleLogDelete(entry.id)}>删除</button>
+    </div>
+  </div>
+  <div className="text-xs sm:text-sm text-zinc-300 flex flex-wrap gap-2">
+    {product.connection && <>连接: {product.connection} | </>}
+    {entryCoil.voltage && <>电压: {entryCoil.voltage} | </>}
+    {product.max_pressure && <>压力范围: {product.max_pressure} | </>}
+    {product.medium_temperature && <>温度范围: {product.medium_temperature}</>}
+  </div>
+</li>
+
               );
             })}
           </ul>
@@ -1253,42 +1263,41 @@ const handleImageUpload = async (e) => {
           <h2 className="text-lg font-semibold mb-2">销售报表</h2>
 
         {/* Report Type Buttons */}
-        <div className="flex flex-wrap gap-2 mb-2">
-          <button
-            className={`px-4 py-2 rounded w-full sm:w-auto ${
-              reportType === 'monthly' ? 'bg-blue-600' : 'bg-gray-600'
-            }`}
-            onClick={() => setReportType('monthly')}
-          >
-            月报表
-          </button>
+          <div className="flex flex-wrap gap-2 mb-2">
+            <button
+              className={`px-4 py-2 rounded w-[25%] sm:w-auto text-sm sm:text-base ${
+                reportType === 'monthly' ? 'bg-blue-600' : 'bg-gray-600'
+              }`}
+              onClick={() => setReportType('monthly')}
+            >
+              月报表
+            </button>
 
-          <button
-            className={`px-4 py-2 rounded w-full sm:w-auto ${
-              reportType === 'seasonal' ? 'bg-blue-600' : 'bg-gray-600'
-            }`}
-            onClick={() => setReportType('seasonal')}
-          >
-            季报表
-          </button>
+            <button
+              className={`px-4 py-2 rounded w-[25%] sm:w-auto text-sm sm:text-base ${
+                reportType === 'seasonal' ? 'bg-blue-600' : 'bg-gray-600'
+              }`}
+              onClick={() => setReportType('seasonal')}
+            >
+              季报表
+            </button>
 
-          <button
-            className={`px-4 py-2 rounded w-full sm:w-auto ${
-              reportType === 'yearly' ? 'bg-blue-600' : 'bg-gray-600'
-            }`}
-            onClick={() => setReportType('yearly')}
-          >
-            年报表
-          </button>
+            <button
+              className={`px-4 py-2 rounded w-[25%] sm:w-auto text-sm sm:text-base ${
+                reportType === 'yearly' ? 'bg-blue-600' : 'bg-gray-600'
+              }`}
+              onClick={() => setReportType('yearly')}
+            >
+              年报表
+            </button>
 
-          <button
-            className="bg-green-600 px-4 py-2 rounded w-full sm:w-auto sm:ml-auto"
-            onClick={exportPDF}
-          >
-            下载PDF
-          </button>
-        </div>
-
+            <button
+              className="hidden bg-green-600 px-4 py-2 rounded w-[25%] sm:w-auto text-sm sm:text-base mt-2 sm:mt-0 sm:ml-auto"
+              onClick={exportPDF}
+            >
+              下载PDF
+            </button>
+          </div>
 
           {/* Report Value Selector */}
           <div className="flex gap-2 mb-4">
@@ -1325,93 +1334,89 @@ const handleImageUpload = async (e) => {
             <button className="bg-blue-600 px-4 py-2 rounded" onClick={() => generateReport(reportType, reportValue)}>生成报表</button>
           </div>
 
-          {/* Report Table */}
-        <div id="report-container">
-        {/* 按 manufacturer 分组 + 分页 + 合计 */}
-        {Object.entries(
-          reportData.reduce((acc, r) => {
-            const product = products.find(p => p.model_number == r.product_name);
-            const manufacturer = product?.manufacturer || "未知厂商";
-            console.log("product:",product)
-            console.log("manufacturer:",manufacturer)
-            if (!acc[manufacturer]) acc[manufacturer] = [];
-            acc[manufacturer].push(r);
-            return acc;
-          }, {})
-        ).map(([manufacturer, data]) => {
-          // 独立分页变量
-          var pageSizeVar = 10; // 每页行数，可改
-          var currentPageVar = 1; // 默认页
-          var startIndexVar = (currentPageVar - 1) * pageSizeVar;
+          {/* Report table */}
+        <div id="report-container" className="space-y-8">
+          {Object.entries(
+            reportData.reduce((acc, r) => {
+              const product = products.find(p => p.model_number.toLowerCase() === r.product_name.toLowerCase());
+              const manufacturer = product?.manufacturer || "未知厂商";
+              if (!acc[manufacturer]) acc[manufacturer] = [];
+              acc[manufacturer].push(r);
+              return acc;
+            }, {})
+          ).map(([manufacturer, data]) => {
+            const pageSizeVar = 10;
+            const currentPageVar = 1;
+            const startIndexVar = (currentPageVar - 1) * pageSizeVar;
+            const paginatedDataVar = data.slice(startIndexVar, startIndexVar + pageSizeVar);
 
-          var paginatedDataVar = data.slice(startIndexVar, startIndexVar + pageSizeVar);
+            return (
+              <div key={manufacturer} className="mb-8">
+                <h2 className="text-base sm:text-lg font-bold mb-2">{manufacturer}</h2>
 
-          // 表格 JSX
-          var reportTable = (
-            <div key={manufacturer} className="mb-8">
-              <h2 className="text-lg font-bold mb-2">{manufacturer}</h2>
-
-              <table className="w-full text-left border border-zinc-700">
-                <thead>
-                  <tr className="border-b border-zinc-700">
-                    <th className="px-2 py-1">序列</th>
-                    <th className="px-2 py-1">名称</th>
-                    <th className="px-2 py-1">型号</th>
-                    <th className="px-2 py-1">电压</th>
-                    <th className="px-2 py-1">售卖数量</th>
-                    <th className="px-2 py-1">购买公司</th>
-                    <th className="px-2 py-1">销售额/元</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedDataVar.map((r, i) => (
-                    <tr key={i} className="border-b border-zinc-700">
-                      <td className="px-2 py-1">{i + 1}</td>
-                      <td className="px-2 py-1">{r.product_type}</td>
-                      <td className="px-2 py-1">{r.product_name}</td>
-                      <td className="px-2 py-1">{r.voltage}</td>
-                      <td className="px-2 py-1">{r.quantity}</td>
-                      <td className="px-2 py-1">{r.company_sold_to}</td>
-                      <td className="px-2 py-1">{r.sales}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-zinc-700 font-bold">
-                    <td colSpan={4} className="px-2 py-1">合计</td>
-                    <td className="px-2 py-1">{data.reduce((sum, r) => sum + r.quantity, 0)}</td>
-                    <td></td>
-                    <td className="px-2 py-1">{data.reduce((sum, r) => sum + r.sales, 0)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-
-              {/* 分页按钮 */}
-              {Math.ceil(data.length / pageSizeVar) > 1 && (
-                <div className="mt-2 flex justify-center gap-2">
-                  <button
-                    disabled={currentPageVar === 1}
-                    onClick={() => currentPageVar--}
-                    className="px-2 py-1 border rounded disabled:opacity-50"
-                  >
-                    上一页
-                  </button>
-                  <span>{currentPageVar} / {Math.ceil(data.length / pageSizeVar)}</span>
-                  <button
-                    disabled={currentPageVar === Math.ceil(data.length / pageSizeVar)}
-                    onClick={() => currentPageVar++}
-                    className="px-2 py-1 border rounded disabled:opacity-50"
-                  >
-                    下一页
-                  </button>
+                {/* 表格外层加横向滚动 */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border border-zinc-700 text-xs sm:text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="px-1 py-1">序列</th>
+                        <th className="px-1 py-1">名称</th>
+                        <th className="px-1 py-1">型号</th>
+                        <th className="px-1 py-1">电压</th>
+                        <th className="px-1 py-1">售卖数量</th>
+                        <th className="px-1 py-1">购买公司</th>
+                        <th className="px-1 py-1">销售额/元</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedDataVar.map((r, i) => (
+                        <tr key={i} className="border-b border-zinc-700">
+                          <td className="px-1 py-1">{i + 1}</td>
+                          <td className="px-1 py-1">{r.product_type}</td>
+                          <td className="px-1 py-1">{r.product_name}</td>
+                          <td className="px-1 py-1">{r.voltage}</td>
+                          <td className="px-1 py-1">{r.quantity}</td>
+                          <td className="px-1 py-1">{r.company_sold_to}</td>
+                          <td className="px-1 py-1">{r.sales}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-zinc-700 font-bold">
+                        <td colSpan={4} className="px-1 py-1">合计</td>
+                        <td className="px-1 py-1">{data.reduce((sum, r) => sum + r.quantity, 0)}</td>
+                        <td></td>
+                        <td className="px-1 py-1">{data.reduce((sum, r) => sum + r.sales, 0)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-              )}
-            </div>
-          );
 
-          return reportTable;
-        })}
+                {/* 分页按钮 */}
+                {Math.ceil(data.length / pageSizeVar) > 1 && (
+                  <div className="mt-2 flex justify-center gap-2 flex-wrap text-xs sm:text-sm">
+                    <button
+                      disabled={currentPageVar === 1}
+                      onClick={() => currentPageVar--}
+                      className="px-2 py-1 border rounded disabled:opacity-50"
+                    >
+                      上一页
+                    </button>
+                    <span>{currentPageVar} / {Math.ceil(data.length / pageSizeVar)}</span>
+                    <button
+                      disabled={currentPageVar === Math.ceil(data.length / pageSizeVar)}
+                      onClick={() => currentPageVar++}
+                      className="px-2 py-1 border rounded disabled:opacity-50"
+                    >
+                      下一页
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+
         </div>
 
         {/* Best Seller Chart */}
@@ -1520,9 +1525,6 @@ const handleImageUpload = async (e) => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-
-
 
       </div>
     </div>
