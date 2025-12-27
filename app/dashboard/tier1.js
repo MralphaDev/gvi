@@ -60,7 +60,7 @@ const [onProductEdit, setOnProductEdit] = useState(false);
 const [onCoilEdit, setOnCoilEdit] = useState(false);
 const [onLogEdit, setOnLogEdit] = useState(false);
 
-const [popupProduct, setPopupProduct] = useState(null);
+const [activeInventory, setActiveInventory] = useState("valve"); // 手机端选择显示的库存
 
 const fields = [
   { name: "name", placeholder: "新产品名" },
@@ -516,7 +516,7 @@ const handleImageUpload = async (e) => {
 
 
   return (
-    <div className="min-h-screen md:p-10 bg-black text-white overflow-x-hidden px-4 ">
+    <div className="min-h-screen md:p-10 overflow-x-hidden bg-black text-white  px-4 ">
       <h1 className="text-2xl font-bold mb-6 mt-5 ">科延自动化库存管理系统</h1>
       {/* Curtain Menu ICON DIV*/}
       <div className="fixed top-4 right-4 z-[9999]">
@@ -541,6 +541,24 @@ const handleImageUpload = async (e) => {
           
         </button>
       </div>
+      {/* 手机端库存切换 */}
+      {menuOpen && window.innerWidth < 768 && (
+        <div className="fixed top-16 right-4 z-[9999] flex flex-col gap-1">
+          <button 
+            className={`px-2 py-1 text-sm rounded ${activeInventory === "valve" ? "bg-blue-600" : "bg-zinc-800"}`}
+            onClick={() => setActiveInventory("valve")}
+          >
+            阀体库存
+          </button>
+          <button 
+            className={`px-2 py-1 text-sm rounded ${activeInventory === "coil" ? "bg-blue-600" : "bg-zinc-800"}`}
+            onClick={() => setActiveInventory("coil")}
+          >
+            线圈库存
+          </button>
+        </div>
+      )}
+
 
        {/* Fullscreen Curtain Menu */}
       <AnimatePresence>
@@ -550,12 +568,12 @@ const handleImageUpload = async (e) => {
             animate={{ y: 0 }}
             exit={{ y: "-100%" }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="fixed overflow-y-auto  inset-0 z-40 bg-black z-[999]"
+            className="fixed   inset-0 z-40 bg-black z-[999]"
           >
 
             {/* Content */}
             <div className="h-full grid grid-cols-1 md:grid-cols-2 gap-6 md:p-8 md:w-full">
-              <div className="bg-zinc-900 rounded-lg md:overflow-y-auto">
+              {(window.innerWidth >= 768 || activeInventory === "valve") && (<div className="bg-zinc-900 rounded-lg md:overflow-y-auto">
                 {/* Product Inventory */}
                 <div className="bg-zinc-800 rounded-xl p-4 overflow-x-hidden md:overflow-auto flex flex-col md:gap-4 gap-5">
                   <h2 className="text-lg font-semibold mb-2">阀体库存</h2>
@@ -893,8 +911,8 @@ const handleImageUpload = async (e) => {
                   </div>
                 </div>
               </div>
-
-              <div className="bg-zinc-900 rounded-lg overflow-y-auto">
+              )}
+              {(window.innerWidth >= 768 || activeInventory === "coil") && (<div className="bg-zinc-900 rounded-lg overflow-y-auto">
                   {/* Coil Inventory */}
                 <div className="bg-zinc-800 rounded-xl p-4 overflow-auto flex flex-col md:gap-4">
                   <h2 className="text-lg font-semibold mb-2">线圈库存</h2>
@@ -1058,12 +1076,13 @@ const handleImageUpload = async (e) => {
                     </button>
                   </div>
                 </div>
-              </div>
+              </div>)}
+
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
+      
       {/* Main Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
 
