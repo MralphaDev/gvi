@@ -455,6 +455,7 @@ const handleImageUpload = async (e) => {
                   {fields.slice(startIndex, startIndex + 4).map((field, i) => {
                       // 新产品名
                         const valveTypes = [
+                        "通用电磁阀",
                         "气动角座阀",
                         "单向阀",
                         "液氮过滤器",
